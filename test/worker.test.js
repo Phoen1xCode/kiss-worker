@@ -104,10 +104,14 @@ describe("KISS Worker protocol", () => {
   it("keeps the existing authorization failure response", async () => {
     const response = await exports.default.fetch("https://worker.test/sync", {
       method: "POST",
-      headers: { Authorization: "Bearer invalid" },
+      headers: {
+        Origin: "https://app.example",
+        Authorization: "Bearer invalid",
+      },
       body: "{}",
     });
     expect(response.status).toBe(403);
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
     expect(await response.text()).toBe(
       "Sorry, you have supplied an invalid key."
     );

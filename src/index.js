@@ -33,11 +33,17 @@ const corsHeaders = {
  * 生成具有统一 CORS 与 JSON Content-Type 的响应。
  * init 中显式提供的响应头最后合并，便于调用方在不丢失公共头的情况下覆盖默认值。
  */
+function corsResponse(body, init = {}) {
+  return new Response(body, {
+    ...init,
+    headers: { ...corsHeaders, ...init.headers },
+  });
+}
+
 function jsonResponse(data, init = {}) {
-  return new Response(JSON.stringify(data), {
+  return corsResponse(JSON.stringify(data), {
     ...init,
     headers: {
-      ...corsHeaders,
       "content-type": "application/json;charset=UTF-8",
       ...init.headers,
     },
@@ -242,13 +248,13 @@ export class SyncObject extends DurableObject {
  */
 export default {
   async fetch(request, env) {
-    // AUTH_VALUE 是部署必需的 Secret；缺失时拒绝提供一个看似可用但无法鉴权的服务。
-    if (!env.AUTH_VALUE) {
-      return new Response("Must set AUTH_VALUE environment.", { status: 503 });
-    }
-
     if (request.method === "OPTIONS") {
       return handleOptions(request);
+    }
+
+    // AUTH_VALUE 是部署必需的 Secret；缺失时拒绝提供一个看似可用但无法鉴权的服务。
+    if (!env.AUTH_VALUE) {
+      return corsResponse("Must set AUTH_VALUE environment.", { status: 503 });
     }
 
     const { pathname, searchParams } = new URL(request.url);
@@ -256,7 +262,7 @@ export default {
       // /sync 使用 Authorization Bearer 摘要，保持 KISS-Translator 当前请求协议不变。
       const expectPsk = `Bearer ${await sha256(env.AUTH_VALUE, KV_SALT_SYNC)}`;
       if (request.headers.get("Authorization") !== expectPsk) {
-        return new Response("Sorry, you have supplied an invalid key.", {
+        return corsResponse("Sorry, you have supplied an invalid key.", {
           status: 403,
         });
       }
@@ -264,28 +270,28 @@ export default {
       try {
         const data = await request.json();
         if (!isValidRecord(data)) {
-          return new Response("Fields Error.", { status: 400 });
+          return corsResponse("Fields Error.", { status: 400 });
         }
         // 外部请求通过验证后才转发到按 key 隔离的内部对象。
         const response = await callSyncObject(env, "sync", data);
         if (!response.ok) {
-          return new Response("Fields Error.", { status: response.status });
+          return corsResponse("Fields Error.", { status: response.status });
         }
         return jsonResponse(await response.json());
       } catch {
-        return new Response("Unknown Error", { status: 500 });
+        return corsResponse("Unknown Error", { status: 500 });
       }
     }
 
     if (request.method === "GET" && pathname === "/rules") {
       // psk 继续使用查询参数是分享链接的兼容要求；变更位置会使所有现有链接失效。
       if (!searchParams.has("psk")) {
-        return new Response("Missing query parameter", { status: 403 });
+        return corsResponse("Missing query parameter", { status: 403 });
       }
 
       const expectPsk = await sha256(env.AUTH_VALUE, KV_SALT_SHARE);
       if (searchParams.get("psk") !== expectPsk) {
-        return new Response("Sorry, you have supplied an invalid key.", {
+        return corsResponse("Sorry, you have supplied an invalid key.", {
           status: 403,
         });
       }
@@ -297,20 +303,17 @@ export default {
         });
         const record = await response.json();
         if (record === null) {
-          return new Response("Empty data", { status: 500 });
+          return corsResponse("Empty data", { status: 500 });
         }
         // 先解析再格式化，延续旧接口返回可读 JSON 且拒绝损坏规则数据的行为。
-        return new Response(JSON.stringify(JSON.parse(record.value), null, 2), {
-          headers: {
-            ...corsHeaders,
-            "content-type": "application/json;charset=UTF-8",
-          },
+        return corsResponse(JSON.stringify(JSON.parse(record.value), null, 2), {
+          headers: { "content-type": "application/json;charset=UTF-8" },
         });
       } catch {
-        return new Response("Unknown Error", { status: 500 });
+        return corsResponse("Unknown Error", { status: 500 });
       }
     }
 
-    return new Response("Not Found", { status: 404 });
+    return corsResponse("Not Found", { status: 404 });
   },
 };
