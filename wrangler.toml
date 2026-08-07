@@ -3,6 +3,7 @@ main = "src/index.js"
 compatibility_date = "2023-07-28"
 [[kv_namespaces]]
 binding = "KV"
+id = "5fa711122901498d92c6ae70bd11087c"
 
 [[durable_objects.bindings]]
 name = "SYNC_OBJECT"
@@ -11,3 +12,18 @@ class_name = "SyncObject"
 [exports.SyncObject]
 type = "durable-object"
 storage = "sqlite"
+
+[observability]
+enabled = false
+head_sampling_rate = 1
+
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+persist = true
+invocation_logs = true
+
+[observability.traces]
+enabled = true
+persist = true
+head_sampling_rate = 1
