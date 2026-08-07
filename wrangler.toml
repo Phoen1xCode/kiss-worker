@@ -3,7 +3,7 @@ main = "src/index.js"
 compatibility_date = "2023-07-28"
 [[kv_namespaces]]
 binding = "KV"
-id = "5fa711122901498d92c6ae70bd11087c"
+id = "7a7d4dc1674644878dd1745afe332999"
 
 [[durable_objects.bindings]]
 name = "SYNC_OBJECT"
